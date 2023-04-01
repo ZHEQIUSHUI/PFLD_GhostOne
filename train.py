@@ -10,35 +10,47 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-
+from easydict import EasyDict as edict
 from config import get_config
-from dataset.datasets import WLFWDatasets
+from dataset.lmk3ddataset import LMK3DDataSet
 from utils.utils import init_weights, save_checkpoint, set_logger, write_cfg
-from utils.loss import LandmarkLoss
+from utils.loss import LandmarkLoss,DepthLoss
 from test import compute_nme
 
 from models.PFLD import PFLD
 from models.PFLD_GhostNet import PFLD_GhostNet
 from models.PFLD_GhostNet_Slim import PFLD_GhostNet_Slim
+from models.PFLD_GhostNet_Slim_3D import PFLD_GhostNet_Slim_3D
 from models.PFLD_GhostOne import PFLD_GhostOne
 
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 
 warnings.filterwarnings("ignore")
 
+global_step = 0
 
-def train(model, train_dataloader, loss_fn, optimizer, cfg, progress, batch_task):
+def train(model, writer:SummaryWriter, train_dataloader:DataLoader, loss_fn:LandmarkLoss, loss_depth_fn:DepthLoss, loss_angle_fn:DepthLoss,optimizer, cfg, progress:Progress, batch_task):
     losses = []
     model.train()
+    global global_step
 
-    for img, landmark_gt in train_dataloader:
+    for img, landmark_gt,depth_gt,angle_gt in train_dataloader:
         progress.advance(batch_task, advance=1)
 
         img = img.to(cfg.DEVICE)
         landmark_gt = landmark_gt.to(cfg.DEVICE)
-        landmark_pred = model(img)
-        loss = loss_fn(landmark_gt, landmark_pred)
+        depth_gt = depth_gt.to(cfg.DEVICE)
+        angle_gt = angle_gt.to(cfg.DEVICE)
+        landmark_pred, depth_pred, angle_pred  = model(img)
+        loss_lmk = loss_fn(landmark_gt, landmark_pred)
+        loss_dep = loss_depth_fn(depth_gt,depth_pred)
+        loss_ang = loss_angle_fn(angle_gt,angle_pred)*10
         optimizer.zero_grad()
+        loss = loss_lmk + loss_dep + loss_ang
+        writer.add_scalar('Train_Loss_Landmark', loss_lmk.cpu().detach().numpy(),global_step)
+        writer.add_scalar('Train_Loss_Depth', loss_dep.cpu().detach().numpy(),global_step)
+        writer.add_scalar('Train_Loss_Angle', loss_ang.cpu().detach().numpy(),global_step)
+        global_step+=1
         loss.backward()
         optimizer.step()
 
@@ -93,29 +105,31 @@ def main():
     main_worker(cfg)
 
 
-def main_worker(cfg):
+def main_worker(cfg:edict):
     # ======= LOADING DATA ======= #
     logging.warning('=======>>>>>>> Loading Training and Validation Data')
     TRAIN_DATA_PATH = cfg.TRAIN_DATA_PATH
     VAL_DATA_PATH = cfg.VAL_DATA_PATH
     TRANSFORM = cfg.TRANSFORM
+    MODEL_TYPE = cfg.MODEL_TYPE
+    WIDTH_FACTOR = cfg.WIDTH_FACTOR
+    INPUT_SIZE = cfg.INPUT_SIZE
+    LANDMARK_NUMBER = cfg.LANDMARK_NUMBER
 
-    train_dataset = WLFWDatasets(TRAIN_DATA_PATH, TRANSFORM)
+    train_dataset = LMK3DDataSet(INPUT_SIZE[0])
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.TRAIN_BATCH_SIZE, shuffle=True, num_workers=cfg.NUM_WORKERS, drop_last=False)
 
-    val_dataset = WLFWDatasets(VAL_DATA_PATH, TRANSFORM)
-    val_dataloader = DataLoader(val_dataset, batch_size=cfg.VAL_BATCH_SIZE, shuffle=False, num_workers=cfg.NUM_WORKERS)
+    # val_dataset = LMK3DDataSet(VAL_DATA_PATH, TRANSFORM)
+    # val_dataloader = DataLoader(val_dataset, batch_size=cfg.VAL_BATCH_SIZE, shuffle=False, num_workers=cfg.NUM_WORKERS)
 
     # ======= MODEL ======= #
     MODEL_DICT = {'PFLD': PFLD,
                   'PFLD_GhostNet': PFLD_GhostNet,
                   'PFLD_GhostNet_Slim': PFLD_GhostNet_Slim,
                   'PFLD_GhostOne': PFLD_GhostOne,
+                  'PFLD_GhostNet_Slim_3D': PFLD_GhostNet_Slim_3D,
                   }
-    MODEL_TYPE = cfg.MODEL_TYPE
-    WIDTH_FACTOR = cfg.WIDTH_FACTOR
-    INPUT_SIZE = cfg.INPUT_SIZE
-    LANDMARK_NUMBER = cfg.LANDMARK_NUMBER
+
     model = MODEL_DICT[MODEL_TYPE](WIDTH_FACTOR, INPUT_SIZE[0], LANDMARK_NUMBER).to(cfg.DEVICE)
     # model.apply(init_weights)
     if cfg.RESUME:
@@ -127,6 +141,8 @@ def main_worker(cfg):
 
     # ======= LOSS ======= #
     loss_fn = LandmarkLoss(LANDMARK_NUMBER)
+    loss_depth_fn = DepthLoss(LANDMARK_NUMBER)
+    loss_angle_fn = DepthLoss(3)
     logging.warning('=======>>>>>>> Loss Function Generated')
 
     # ======= OPTIMIZER ======= #
@@ -163,24 +179,24 @@ def main_worker(cfg):
             progress.reset(batch_task)
             progress.reset(test_task)
             progress.update(batch_task, description="[green]Epoch {} :".format(epoch), total=len(train_dataloader))
-            train_loss = train(model, train_dataloader, loss_fn, optimizer, cfg, progress, batch_task)
-            val_loss, val_nme = validate(model, val_dataloader, loss_fn, cfg, progress, test_task)
+            train_loss = train(model,writer, train_dataloader, loss_fn,loss_depth_fn,loss_angle_fn, optimizer, cfg, progress, batch_task)
+            # val_loss, val_nme = validate(model, val_dataloader, loss_fn, cfg, progress, test_task)
             scheduler.step()
 
-            if val_nme < best_nme:
-                best_nme = val_nme
-                save_checkpoint(cfg, model, extra='best')
-                logging.info('Save best model')
+            # if val_nme < best_nme:
+            #     best_nme = val_nme
+            #     save_checkpoint(cfg, model, extra='best')
+            #     logging.info('Save best model')
             save_checkpoint(cfg, model, epoch)
 
             writer.add_scalar('Learning_Rate', optimizer.param_groups[0]['lr'], epoch)
             writer.add_scalar('Train_Loss', train_loss, epoch)
-            writer.add_scalar('Val_Loss', val_loss, epoch)
-            writer.add_scalar('Val_NME', val_nme, epoch)
+            # writer.add_scalar('Val_Loss', val_loss, epoch)
+            # writer.add_scalar('Val_NME', val_nme, epoch)
 
             logging.info('Train_Loss: {}'.format(train_loss))
-            logging.info('Val_Loss: {}'.format(val_loss))
-            logging.info('Val_NME: {}'.format(val_nme) + '\n')
+            # logging.info('Val_Loss: {}'.format(val_loss))
+            # logging.info('Val_NME: {}'.format(val_nme) + '\n')
 
     save_checkpoint(cfg, model, extra='final')
 

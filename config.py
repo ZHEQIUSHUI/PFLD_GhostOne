@@ -5,21 +5,21 @@ import os
 import torch
 
 
-def get_config():
+def get_config() -> edict:
     cfg = edict()
     cfg.SEED = 2023
     cfg.DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    cfg.GPU_ID = 3
+    cfg.GPU_ID = 0
 
     cfg.TRANSFORM = trans.Compose([trans.ToTensor(),
                                    trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
 
-    cfg.MODEL_TYPE = 'PFLD_GhostNet_Slim'  # [PFLD, PFLD_GhostNet, PFLD_GhostNet_Slim, PFLD_GhostOne]
-    cfg.INPUT_SIZE = [112, 112]
+    cfg.MODEL_TYPE = 'PFLD_GhostNet_Slim_3D'  # [PFLD, PFLD_GhostNet, PFLD_GhostNet_Slim, PFLD_GhostOne]
+    cfg.INPUT_SIZE = [128, 128]
     cfg.WIDTH_FACTOR = 1
-    cfg.LANDMARK_NUMBER = 98
+    cfg.LANDMARK_NUMBER = 68
 
-    cfg.TRAIN_BATCH_SIZE = 32
+    cfg.TRAIN_BATCH_SIZE = 64
     cfg.VAL_BATCH_SIZE = 8
 
     cfg.TRAIN_DATA_PATH = './data/train_data_repeat80/list.txt'
@@ -33,7 +33,7 @@ def get_config():
 
     cfg.RESUME = False
     if cfg.RESUME:
-        cfg.RESUME_MODEL_PATH = ''
+        cfg.RESUME_MODEL_PATH = '/home/qiushui/Projects/pycode/PFLD_GhostOne/checkpoint/models/PFLD_GhostNet_Slim_3D_1_128_2023-04-01-01-12/pfld_ghostnet_slim_3d_step:1.pth'
 
     create_time = get_time()
     cfg.MODEL_PATH = './checkpoint/models/{}_{}_{}_{}/'.format(cfg.MODEL_TYPE, cfg.WIDTH_FACTOR, cfg.INPUT_SIZE[0], create_time)
