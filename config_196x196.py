@@ -14,8 +14,8 @@ def get_config(isTrain = True) -> edict:
     cfg.TRANSFORM = trans.Compose([trans.ToTensor(),
                                    trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
 
-    cfg.MODEL_TYPE = 'PFLD_GhostNet_Slim_3D'  # [PFLD, PFLD_GhostNet, PFLD_GhostNet_Slim, PFLD_GhostOne]
-    cfg.INPUT_SIZE = [128, 128]
+    cfg.MODEL_TYPE = 'PFLD_GhostNet_Slim_3D_new'  # [PFLD, PFLD_GhostNet, PFLD_GhostNet_Slim, PFLD_GhostOne]
+    cfg.INPUT_SIZE = [196, 196]
     cfg.WIDTH_FACTOR = 1
     cfg.LANDMARK_NUMBER = 68
 
@@ -26,14 +26,14 @@ def get_config(isTrain = True) -> edict:
     cfg.VAL_DATA_PATH = './data/test_data_repeat80/list.txt'
 
     cfg.EPOCHES = 80
-    cfg.LR = 1e-7
+    cfg.LR = 1e-3
     cfg.WEIGHT_DECAY = 1e-6
-    cfg.NUM_WORKERS = 11
-    cfg.MILESTONES = [20, 45]
+    cfg.NUM_WORKERS = 8
+    cfg.MILESTONES = [3, 30, 45]
 
     cfg.RESUME = True
     if cfg.RESUME:
-        cfg.RESUME_MODEL_PATH = "checkpoint/models/PFLD_GhostNet_Slim_3D_1_128_2023-04-09-11-47/pfld_ghostnet_slim_3d_step:12.pth"
+        cfg.RESUME_MODEL_PATH = "checkpoint/models/PFLD_GhostNet_Slim_3D_new_1_196_2023-04-05-20-47/pfld_ghostnet_slim_3d_new_step:2.pth"
 
     create_time = get_time()
     cfg.MODEL_PATH = './checkpoint/models/{}_{}_{}_{}/'.format(cfg.MODEL_TYPE, cfg.WIDTH_FACTOR, cfg.INPUT_SIZE[0], create_time)

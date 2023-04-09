@@ -21,8 +21,9 @@ from models.PFLD import PFLD
 from models.PFLD_GhostNet import PFLD_GhostNet
 from models.PFLD_GhostNet_Slim import PFLD_GhostNet_Slim
 from models.PFLD_GhostNet_Slim_3D import PFLD_GhostNet_Slim_3D
+from models.PFLD_GhostNet_Slim_3D_new import PFLD_GhostNet_Slim_3D_new
 from models.PFLD_GhostOne import PFLD_GhostOne
-
+# import thop
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 
 warnings.filterwarnings("ignore")
@@ -128,6 +129,7 @@ def main_worker(cfg:edict):
                   'PFLD_GhostNet_Slim': PFLD_GhostNet_Slim,
                   'PFLD_GhostOne': PFLD_GhostOne,
                   'PFLD_GhostNet_Slim_3D': PFLD_GhostNet_Slim_3D,
+                  'PFLD_GhostNet_Slim_3D_new': PFLD_GhostNet_Slim_3D_new
                   }
 
     model = MODEL_DICT[MODEL_TYPE](WIDTH_FACTOR, INPUT_SIZE[0], LANDMARK_NUMBER).to(cfg.DEVICE)
@@ -135,6 +137,7 @@ def main_worker(cfg:edict):
     if cfg.RESUME:
         if os.path.isfile(cfg.RESUME_MODEL_PATH):
             model.load_state_dict(torch.load(cfg.RESUME_MODEL_PATH))
+            logging.info("MODEL: Checkpoint Load from '{}".format(cfg.RESUME_MODEL_PATH))
         else:
             logging.warning("MODEL: No Checkpoint Found at '{}".format(cfg.RESUME_MODEL_PATH))
     logging.warning('=======>>>>>>> {} Model Generated'.format(MODEL_TYPE))
@@ -161,6 +164,8 @@ def main_worker(cfg:edict):
 
     dummy_input = torch.rand(1, 3, INPUT_SIZE[0], INPUT_SIZE[1]).to(cfg.DEVICE)
     writer.add_graph(model, (dummy_input,))
+    # ops, params = thop.profile(model, [dummy_input])
+    # print(ops/1000000, " mflops", params/1000000, " mparams")
 
     best_nme = float('inf')
 
