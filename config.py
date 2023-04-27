@@ -14,26 +14,26 @@ def get_config():
     cfg.TRANSFORM = trans.Compose([trans.ToTensor(),
                                    trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
 
-    cfg.MODEL_TYPE = 'PFLD_GhostNet_Slim'  # [PFLD, PFLD_GhostNet, PFLD_GhostNet_Slim, PFLD_GhostOne]
-    cfg.INPUT_SIZE = [112, 112]
-    cfg.WIDTH_FACTOR = 1
-    cfg.LANDMARK_NUMBER = 98
+    cfg.MODEL_TYPE = 'PFLD_GhostNet_Slim_coco'  # [PFLD, PFLD_GhostNet, PFLD_GhostNet_Slim, PFLD_GhostOne]
+    cfg.INPUT_SIZE = [192,256]
+    cfg.WIDTH_FACTOR = 2
+    cfg.LANDMARK_NUMBER = 17
 
-    cfg.TRAIN_BATCH_SIZE = 32
+    cfg.TRAIN_BATCH_SIZE = 128
     cfg.VAL_BATCH_SIZE = 8
 
-    cfg.TRAIN_DATA_PATH = './data/train_data_repeat80/list.txt'
+    cfg.TRAIN_DATA_PATH = '/ihoment/junda/pycode/cocokp'
     cfg.VAL_DATA_PATH = './data/test_data_repeat80/list.txt'
 
     cfg.EPOCHES = 80
     cfg.LR = 1e-4
     cfg.WEIGHT_DECAY = 1e-6
-    cfg.NUM_WORKERS = 8
+    cfg.NUM_WORKERS = 32
     cfg.MILESTONES = [55, 65, 75]
 
-    cfg.RESUME = False
+    cfg.RESUME = True
     if cfg.RESUME:
-        cfg.RESUME_MODEL_PATH = ''
+        cfg.RESUME_MODEL_PATH = 'checkpoint/models/PFLD_GhostNet_Slim_coco_2_192_2023-04-27-17-38/pfld_ghostnet_slim_coco_step:1.pth'
 
     create_time = get_time()
     cfg.MODEL_PATH = './checkpoint/models/{}_{}_{}_{}/'.format(cfg.MODEL_TYPE, cfg.WIDTH_FACTOR, cfg.INPUT_SIZE[0], create_time)
